@@ -4,65 +4,28 @@ set LAB=%1
 set EX=%2
 
 if "%LAB%"=="" (
-    echo [!] Cach dung: .\run ^<So_Lab^> ^<So_Bai^>
-    echo [!] Vi du: .\run 1 3
+    echo [!] Cách dùng: .\run ^<Số_Lab^> ^<Số_Bài^>
+    echo [!] Ví dụ: .\run 1 3
     exit /b
 )
 
-echo [*] Dang kich hoat Lab %LAB% - Exercise %EX%...
+echo [*] Đang kích hoạt Lab %LAB% - Exercise %EX%...
 
-:: 1. XAC DINH THU MUC EXERCISE NGUON
-set "EX_DIR=lab_%LAB%\Excercise %EX%"
-if not exist "%EX_DIR%" set "EX_DIR=lab_%LAB%\Exercise %EX%"
-
-if not exist "%EX_DIR%" (
-    echo [!] KHONG TIM THAY THU MUC: %EX_DIR%
-    goto :END
-)
-
-:: 2. DONG BO MAIN.C TANG CUONG (CHEP DE FILE MAIN.C CUA EXERCISE VAO PROJECT MAIN)
-set "MAIN_UPDATED="
-for /f "delims=" %%m in ('dir /b /s "%EX_DIR%\main.c" 2^>nul') do (
-    :: Tim file main.c goc trong Project STM32 o thu muc lab_%LAB%
-    for /f "delims=" %%target in ('dir /b /s "lab_%LAB%\Core\Src\main.c" 2^>nul') do (
-        copy /y "%%m" "%%target" >nul
-        echo [*] Da cap nhat code Exercise %EX% vao Project STM32 thanh cong!
-        set "MAIN_UPDATED=1"
-        goto :MO_SCHEMATIC
-    )
-)
-
-if not defined MAIN_UPDATED (
-    echo [!] Warning: Khong tim thay file main.c trong %EX_DIR% de chep de.
-)
-
-:MO_SCHEMATIC
-:: 3. MO FILE PROTEUS (.pdsprj)
-set "SCHEMATIC_FOUND="
-
-:: Uu tien 1: File Proteus nam trong thu muc Exercise
-for /f "delims=" %%s in ('dir /b /s "%EX_DIR%\*.pdsprj" 2^>nul') do (
-    start "" "%%s"
-    echo [*] Da mo Proteus Schematic cua Exercise %EX%
-    set "SCHEMATIC_FOUND=1"
-    goto :MO_IDE
-)
-
-:: Uu tien 2: File Proteus chung cua Lab
-if not defined SCHEMATIC_FOUND (
-    for /f "delims=" %%s in ('dir /b "lab_%LAB%\*.pdsprj" 2^>nul') do (
-        start "" "lab_%LAB%\%%s"
-        echo [*] Da mo Proteus Schematic chung cua Lab %LAB%
-        goto :MO_IDE
-    )
-)
-
-:MO_IDE
-:: 4. MO PROJECT STM32CUBEIDE
-for /f "delims=" %%p in ('dir /b /s "lab_%LAB%\*.project" 2^>nul') do (
-    start "" "%%p"
-    echo [*] Da mo STM32CubeIDE Project!
-    goto :END
-)
-
-:END
+:: Chạy script PowerShell ngầm để copy main.c và tìm mở file chính xác
+powershell -NoProfile -ExecutionPolicy Bypass -Command "^
+    $lab = '%LAB%'; $ex = '%EX%'; ^
+    $exDir = Get-ChildItem -Path . -Filter \"lab_$lab\" -Directory | ForEach-Object { Get-ChildItem -Path $_.FullName -Directory | Where-Object { $_.Name -match \"Ex.*cise\s*$ex$\" } } | Select-Object -First 1; ^
+    if ($exDir) { ^
+        $srcMain = Get-ChildItem -Path $exDir.FullName -Filter \"main.c\" -Recurse | Select-Object -First 1; ^
+        $targetMain = Get-ChildItem -Path \"lab_$lab\" -Filter \"main.c\" -Recurse | Where-Object { $_.FullName -like \"*\Core\Src\*\" } | Select-Object -First 1; ^
+        if ($srcMain -and $targetMain) { ^
+            Copy-Item -Path $srcMain.FullName -Destination $targetMain.FullName -Force; ^
+            Write-Host \"[*] Đã cập nhật main.c của Exercise $ex vào Project STM32!\" -ForegroundColor Green; ^
+        } else { Write-Host \"[!] Không tìm thấy main.c nguồn hoặc đích để chép đè.\" -ForegroundColor Yellow; } ^
+        $protFile = Get-ChildItem -Path $exDir.FullName -Filter \"*.pdsprj\" -Recurse | Select-Object -First 1; ^
+        if (-not $protFile) { $protFile = Get-ChildItem -Path \"lab_$lab\" -Filter \"*.pdsprj\" | Select-Object -First 1; } ^
+        if ($protFile) { Invoke-Item $protFile.FullName; Write-Host \"[*] Đã mở Proteus: $($protFile.Name)\" -ForegroundColor Cyan; } ^
+        $projFile = Get-ChildItem -Path \"lab_$lab\" -Filter \"*.project\" -Recurse | Select-Object -First 1; ^
+        if ($projFile) { Invoke-Item $projFile.FullName; Write-Host \"[*] Đã mở STM32 Project!\" -ForegroundColor Cyan; } ^
+    } else { Write-Host \"[!] Không tìm thấy thư mục Exercise $ex trong lab_$lab\" -ForegroundColor Red; } ^
+"
