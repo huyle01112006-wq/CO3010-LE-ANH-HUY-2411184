@@ -4,66 +4,65 @@ set LAB=%1
 set EX=%2
 
 if "%LAB%"=="" (
-    echo [!] Cách dùng: .\run ^<Số_Lab^> ^<Số_Bài^>
-    echo [!] Ví dụ: .\run 1 3
+    echo [!] Cach dung: .\run ^<So_Lab^> ^<So_Bai^>
+    echo [!] Vi du: .\run 1 3
     exit /b
 )
 
-echo [*] Đang xử lý Lab %LAB% - Exercise %EX%...
+echo [*] Dang kich hoat Lab %LAB% - Exercise %EX%...
 
-:: 1. Xác định chính xác thư mục bài tập
+:: 1. XAC DINH THU MUC EXERCISE NGUON
 set "EX_DIR=lab_%LAB%\Excercise %EX%"
 if not exist "%EX_DIR%" set "EX_DIR=lab_%LAB%\Exercise %EX%"
 
 if not exist "%EX_DIR%" (
-    echo [!] KHÔNG TÌM THẤY THƯ MỤC: %EX_DIR%
+    echo [!] KHONG TIM THAY THU MUC: %EX_DIR%
     goto :END
 )
 
-:: 2. MỞ SCHEMATIC PROTEUS (.pdsprj) CỦA BÀI ĐÓ
-set "SCHEMATIC_FOUND="
-:: Tìm file .pdsprj CHÍNH TRONG THƯ MỤC EXERCISE ĐÓ
-for /f "delims=" %%s in ('dir /b /s "%EX_DIR%\*.pdsprj" 2^>nul') do (
-    start "" "%%s"
-    echo [*] Đã mở Proteus Schematic của Exercise %EX%
-    set "SCHEMATIC_FOUND=1"
-    goto :MO_CODE
+:: 2. DONG BO MAIN.C TANG CUONG (CHEP DE FILE MAIN.C CUA EXERCISE VAO PROJECT MAIN)
+set "MAIN_UPDATED="
+for /f "delims=" %%m in ('dir /b /s "%EX_DIR%\main.c" 2^>nul') do (
+    :: Tim file main.c goc trong Project STM32 o thu muc lab_%LAB%
+    for /f "delims=" %%target in ('dir /b /s "lab_%LAB%\Core\Src\main.c" 2^>nul') do (
+        copy /y "%%m" "%%target" >nul
+        echo [*] Da cap nhat code Exercise %EX% vao Project STM32 thanh cong!
+        set "MAIN_UPDATED=1"
+        goto :MO_SCHEMATIC
+    )
 )
 
-:: Nếu không có file .pdsprj riêng trong bài đó, mở file chung ở folder lab_%LAB%
+if not defined MAIN_UPDATED (
+    echo [!] Warning: Khong tim thay file main.c trong %EX_DIR% de chep de.
+)
+
+:MO_SCHEMATIC
+:: 3. MO FILE PROTEUS (.pdsprj)
+set "SCHEMATIC_FOUND="
+
+:: Uu tien 1: File Proteus nam trong thu muc Exercise
+for /f "delims=" %%s in ('dir /b /s "%EX_DIR%\*.pdsprj" 2^>nul') do (
+    start "" "%%s"
+    echo [*] Da mo Proteus Schematic cua Exercise %EX%
+    set "SCHEMATIC_FOUND=1"
+    goto :MO_IDE
+)
+
+:: Uu tien 2: File Proteus chung cua Lab
 if not defined SCHEMATIC_FOUND (
     for /f "delims=" %%s in ('dir /b "lab_%LAB%\*.pdsprj" 2^>nul') do (
         start "" "lab_%LAB%\%%s"
-        echo [*] Đã mở Proteus Schematic chung của Lab %LAB%
-        goto :MO_CODE
+        echo [*] Da mo Proteus Schematic chung cua Lab %LAB%
+        goto :MO_IDE
     )
 )
 
-:MO_CODE
-:: 3. MỞ CHÍNH XÁC PROJECT / CODE CỦA BÀI ĐÓ
-set "CODE_FOUND="
-
-:: Tìm file .project CHỈ NẰM TRONG THƯ MỤC EX_DIR
-for /f "delims=" %%p in ('dir /b /s "%EX_DIR%\.project" 2^>nul') do (
+:MO_IDE
+:: 4. MO PROJECT STM32CUBEIDE
+for /f "delims=" %%p in ('dir /b /s "lab_%LAB%\*.project" 2^>nul') do (
     start "" "%%p"
-    echo [*] Đã mở STM32CubeIDE Project của Exercise %EX%!
-    set "CODE_FOUND=1"
+    echo [*] Da mo STM32CubeIDE Project!
     goto :END
-)
-
-:: Nếu không thấy .project thì mở file main.c CHỈ NẰM TRONG EX_DIR
-if not defined CODE_FOUND (
-    for /f "delims=" %%c in ('dir /b /s "%EX_DIR%\main.c" 2^>nul') do (
-        start "" "%%c"
-        echo [*] Đã mở file main.c của Exercise %EX%!
-        set "CODE_FOUND=1"
-        goto :END
-    )
-)
-
-:: Nếu không có cả 2 thì bật Explorer ngay tại thư mục bài đó
-if not defined CODE_FOUND (
-    explorer "%EX_DIR%"
 )
 
 :END
