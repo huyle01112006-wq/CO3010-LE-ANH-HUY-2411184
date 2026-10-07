@@ -1,0 +1,18 @@
+# Proteus temp files
+*.pdsprj.*.workspace
+*.pdsprj.*.backup
+*.PWI
+
+# STM32 / IDE build files
+Debug/
+Release/
+build/
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+*.d
+*.su
+.metadata/
+.settings/
